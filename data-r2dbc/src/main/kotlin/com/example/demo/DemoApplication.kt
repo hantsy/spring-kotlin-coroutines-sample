@@ -10,6 +10,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.boot.runApplication
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.event.EventListener
+import org.springframework.core.annotation.Order
 import org.springframework.data.annotation.Id
 import org.springframework.data.domain.Sort.Order.desc
 import org.springframework.data.domain.Sort.by
@@ -18,8 +19,13 @@ import org.springframework.data.r2dbc.function.*
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories
 import org.springframework.data.relational.core.mapping.Column
 import org.springframework.data.relational.core.mapping.Table
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.server.ServerWebExchange
+import org.springframework.web.server.WebExceptionHandler
+import reactor.core.publisher.Mono
+
 
 @SpringBootApplication
 class DemoApplication
@@ -110,6 +116,21 @@ class PostController(
 
 
 class PostNotFoundException(postId: Long) : RuntimeException("Post:$postId is not found...")
+
+@Component
+@Order(-2)
+class RestWebExceptionHandler : WebExceptionHandler {
+
+    override fun handle(exchange: ServerWebExchange, ex: Throwable): Mono<Void> {
+        if (ex is PostNotFoundException) {
+            exchange.response.statusCode = HttpStatus.NOT_FOUND
+
+            // marks the response as complete and forbids writing to it
+            return exchange.response.setComplete()
+        }
+        return Mono.error(ex)
+    }
+}
 
 @Component
 class PostRepository(private val client: DatabaseClient) {
