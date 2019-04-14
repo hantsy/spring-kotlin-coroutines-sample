@@ -135,9 +135,9 @@ class RestWebExceptionHandler : WebExceptionHandler {
 @Component
 class PostRepository(private val client: DatabaseClient) {
 
-    suspend fun count(): Int =
+    suspend fun count(): Long =
             client.execute().sql("SELECT COUNT(*) FROM posts")
-                    .asType<Int>().fetch().awaitOne()
+                    .asType<Long>().fetch().awaitOne()
 
     fun findAll(): Flow<Post> =
             client.select().from("posts").asType<Post>().fetch().flow()
@@ -173,7 +173,6 @@ class CommentRepository(private val client: DatabaseClient) {
                     .sql("SELECT COUNT(*) FROM comments WHERE post_id = \$1")
                     .bind(0, postId)
                     .asType<Long>()
-                    //.map { t, u -> t.get(0, Long::class.java) }
                     .fetch()
                     .awaitOne()
 
