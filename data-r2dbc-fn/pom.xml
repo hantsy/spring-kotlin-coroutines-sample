@@ -16,7 +16,7 @@
 
     <properties>
         <java.version>1.8</java.version>
-        <kotlin.version>1.3.21</kotlin.version>
+        <kotlin.version>1.3.30</kotlin.version>
         <spring.version>5.2.0.M1</spring.version>
         <spring-data-releasetrain.version>Moore-M3</spring-data-releasetrain.version>
         <spring-data-r2dbc.version>1.0.0.BUILD-SNAPSHOT</spring-data-r2dbc.version>
