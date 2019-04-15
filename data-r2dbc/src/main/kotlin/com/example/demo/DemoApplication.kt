@@ -7,6 +7,7 @@ import io.r2dbc.spi.ConnectionFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.reactive.awaitLast
+import kotlinx.coroutines.reactive.awaitSingle
 import kotlinx.coroutines.runBlocking
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.event.ApplicationReadyEvent
@@ -43,7 +44,7 @@ class DataInitializer(/*private val databaseClient: DatabaseClient,*/ private va
 
     @EventListener(value = [ApplicationReadyEvent::class])
     fun init() {
-        println("start data initialization  ...")
+        println(" start data initialization  ...")
         /*this.databaseClient.insert()
                 .into("posts")
                 //.nullValue("id", Long::class.java)
@@ -63,9 +64,12 @@ class DataInitializer(/*private val databaseClient: DatabaseClient,*/ private va
                 )
                 .subscribe(null, null, { println("initialization is done...") })*/
         runBlocking {
-            postRepository.deleteAll()
+            val deleted = postRepository.deleteAll()
+            println(" $deleted posts was cleared.")
             postRepository.init()
         }
+
+        println(" done data initialization  ...")
 
     }
 
@@ -124,17 +128,13 @@ class PostController(
 
 class PostNotFoundException(postId: Long) : RuntimeException("Post:$postId is not found...")
 
-//@Component
-//@Order(-2)
 @RestControllerAdvice
 class RestWebExceptionHandler {
 
     @ExceptionHandler(PostNotFoundException::class)
-    suspend  fun handle(ex: PostNotFoundException, exchange: ServerWebExchange) {
+    suspend fun handle(ex: PostNotFoundException, exchange: ServerWebExchange) {
 
         exchange.response.statusCode = HttpStatus.NOT_FOUND
-
-        // marks the response as complete and forbids writing to it
         exchange.response.setComplete().awaitFirstOrNull()
     }
 }
@@ -157,14 +157,22 @@ class PostRepository(private val client: DatabaseClient) {
                     .awaitOneOrNull()
 
     suspend fun deleteAll() =
-            client.execute().sql("DELETE FROM posts").await()
+            client.execute()
+                    .sql("DELETE FROM posts")
+                    .fetch()
+                    .rowsUpdated()
+                    .awaitSingle()
 
     suspend fun save(post: Post) =
-            client.insert().into<Post>().table("posts").using(post).await()
+            client.insert()
+                    .into<Post>()
+                    .table("posts")
+                    .using(post)
+                    .await()
 
     suspend fun init() {
         //client.execute().sql("CREATE TABLE IF NOT EXISTS posts (login varchar PRIMARY KEY, firstname varchar, lastname varchar);").await()
-        deleteAll()
+        //deleteAll()
         save(Post(title = "My first post title", content = "Content of my first post"))
         save(Post(title = "My second post title", content = "Content of my second post"))
     }
