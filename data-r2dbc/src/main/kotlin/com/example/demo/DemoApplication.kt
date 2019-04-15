@@ -5,6 +5,7 @@ import io.r2dbc.postgresql.PostgresqlConnectionConfiguration
 import io.r2dbc.postgresql.PostgresqlConnectionFactory
 import io.r2dbc.spi.ConnectionFactory
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.runBlocking
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.boot.runApplication
@@ -36,12 +37,12 @@ fun main(args: Array<String>) {
 }
 
 @Component
-class DataInitializer(private val databaseClient: DatabaseClient) {
+class DataInitializer(/*private val databaseClient: DatabaseClient,*/ private val postRepository: PostRepository) {
 
     @EventListener(value = [ApplicationReadyEvent::class])
     fun init() {
         println("start data initialization  ...")
-        this.databaseClient.insert()
+        /*this.databaseClient.insert()
                 .into("posts")
                 //.nullValue("id", Long::class.java)
                 .value("title", "First post title")
@@ -58,7 +59,11 @@ class DataInitializer(private val databaseClient: DatabaseClient) {
                                 .all()
                                 .log()
                 )
-                .subscribe(null, null, { println("initialization is done...") })
+                .subscribe(null, null, { println("initialization is done...") })*/
+        runBlocking {
+            postRepository.deleteAll()
+            postRepository.init()
+        }
 
     }
 
