@@ -5,6 +5,8 @@ import io.r2dbc.postgresql.PostgresqlConnectionConfiguration
 import io.r2dbc.postgresql.PostgresqlConnectionFactory
 import io.r2dbc.spi.ConnectionFactory
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.reactive.awaitFirstOrNull
+import kotlinx.coroutines.reactive.awaitLast
 import kotlinx.coroutines.runBlocking
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.event.ApplicationReadyEvent
@@ -122,18 +124,18 @@ class PostController(
 
 class PostNotFoundException(postId: Long) : RuntimeException("Post:$postId is not found...")
 
-@Component
-@Order(-2)
-class RestWebExceptionHandler : WebExceptionHandler {
+//@Component
+//@Order(-2)
+@RestControllerAdvice
+class RestWebExceptionHandler {
 
-    override fun handle(exchange: ServerWebExchange, ex: Throwable): Mono<Void> {
-        if (ex is PostNotFoundException) {
-            exchange.response.statusCode = HttpStatus.NOT_FOUND
+    @ExceptionHandler(PostNotFoundException::class)
+    suspend  fun handle(ex: PostNotFoundException, exchange: ServerWebExchange) {
 
-            // marks the response as complete and forbids writing to it
-            return exchange.response.setComplete()
-        }
-        return Mono.error(ex)
+        exchange.response.statusCode = HttpStatus.NOT_FOUND
+
+        // marks the response as complete and forbids writing to it
+        exchange.response.setComplete().awaitFirstOrNull()
     }
 }
 
