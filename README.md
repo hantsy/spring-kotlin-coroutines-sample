@@ -3,7 +3,7 @@ Before Spring 5.2,  you can experience Kotlin Coroutines by the effort from comm
 
 Kotlin coroutines provides an alternative approach to  write asynchronous applications with Spring Reactive stack, but in an imperative code style.
 
-In this post, I will rewrite [my reactive sample](https://github.com/hantsy/spring-reactive-sample) in Kotlin Coroutines.
+In this post, I will rewrite [my reactive sample](https://github.com/hantsy/spring-reactive-sample) using Kotlin Coroutines with Spring.
 
 Generate a Spring Boot project using [Spring initializr](https://start.spring.io).  
 
@@ -34,9 +34,15 @@ Define  a **kotlin-coroutines.version** in the properties.
 <kotlinx-coroutines.version>1.2.0</kotlinx-coroutines.version>
 ```
 
-Currently  Spring Data R2DBC added basic coroutines support in `DatabaseClient`,  here we use Spring Data R2DBC for data operations.
+Kotlin coroutines 1.2.0 is compatible with Kotlin 1.3.30, define a `kotlin.version` property in the pom.xml file to use this version.
 
-Add  Spring Data R2DBC related dependencies, and use PostgresSQL as backend database.
+```kot
+<kotlin.version>1.3.30</kotlin.version>
+```
+
+Spring Data are busy in adding Kotlin Coroutines support. Currently  Spring Data R2DBC got basic coroutines support in its`DatabaseClient`.  In this sample, we use Spring Data R2DBC for data operations.
+
+Add Spring Data R2DBC related dependencies, and use PostgresSQL as the backend database.
 
 ```xml
 <dependency>
@@ -56,13 +62,13 @@ Add  Spring Data R2DBC related dependencies, and use PostgresSQL as backend data
 </dependency>
 ```
 
-Currently the coroutines feature is only provided in Spring Data R2DBC **1.0.0.BUILD-SNAPSHOT**, declare a `spring-data-r2dbc.version` property.
+ Declare a `spring-data-r2dbc.version` property to use latest Spring Data R2DBC .
 
 ```xml
  <spring-data-r2dbc.version>1.0.0.BUILD-SNAPSHOT</spring-data-r2dbc.version>
 ```
 
-Enables  R2dbc support by subclassing `AbstractR2dbcConfiguration`.
+Enables Data R2dbc support by subclassing `AbstractR2dbcConfiguration`.
 
 ```java
 @Configuration
@@ -82,9 +88,7 @@ class DatabaseConfig : AbstractR2dbcConfiguration() {
 }
 ```
 
-
-
-Create a data class mapping to the table `posts`.
+Create a data class which is mapped to the table `posts`.
 
 ```java
 @Table("posts")
@@ -94,7 +98,7 @@ data class Post(@Id val id: Long? = null,
 )
 ```
 
-Follow the [Reactive stack to Kotlin Coroutines translation guide](https://docs.spring.io/spring/docs/5.2.0.M1/spring-framework-reference/languages.html#how-reactive-translates-to-coroutines) provided in Spring reference documentation, create a repository class for Post.
+Follow the [Reactive stack to Kotlin Coroutines translation guide](https://docs.spring.io/spring/docs/5.2.0.M1/spring-framework-reference/languages.html#how-reactive-translates-to-coroutines) provided in Spring reference documentation, create a repository class for `Post`.
 
 ```java
 @Component
@@ -135,7 +139,7 @@ class PostRepository(private val client: DatabaseClient) {
 }
 ```
 
-Here is the controller for Post.
+Create a `@RestController` class for `Post`.
 
 ```java
 @RestController
@@ -163,7 +167,7 @@ class PostController(
 }
 ```
 
-You can also initialize data in a `CommandLineRunner`bean or listen the `@ApplicationReadyEvent`, use a `runBlocking` to wrap the suspend functions.
+You can also initialize data in a `CommandLineRunner` bean or listen the `@ApplicationReadyEvent`, use a `runBlocking` to wrap coroutines tasks.
 
 ```kot
 runBlocking {
@@ -173,9 +177,15 @@ runBlocking {
 }
 ```
 
-Run the application, it works as well as [the previous Reactive examples](https://github.com/hantsy/spring-reactive-sample).
+To run the application successfully, make sure there is a running PostgreSQL server. I prepared a [docker compose file](https://github.com/hantsy/spring-kotlin-coroutines-sample/docker-compose.yml) to simply run a PostgresSQL server and initialize the database schema in a docker container. 
 
-You can also convert your router DSL to Kotlin  Coroutines using the new coRouter DSL.
+```sh
+docker-compose up
+```
+
+Run the application now, it should  work well as [the previous Reactive examples](https://github.com/hantsy/spring-reactive-sample).
+
+In additional to the annotated controllers,  Kotlin Coroutines is also supported in functional RouterFunction DSL using the `coRouter`  to define your routing rules. 
 
 ```ko
 @Configuration
@@ -194,7 +204,7 @@ class RouterConfiguration {
 }
 ```
 
-Like the changes in the controller, the `PostHandler` can be written in an imperative way.
+Like the changes in the controller, the `PostHandler` is written in an imperative style.
 
 ```kot
 @Component
@@ -240,7 +250,7 @@ class PostHandler(private val posts: PostRepository) {
 }
 ```
 
-Besides annotated controllers and functional router DSL get Kotlin Coroutines support, Spring `WebClient` also embrace Kotlin Coroutines.
+Besides annotated controllers and functional router DSL, Spring `WebClient` also embrace Kotlin Coroutines.
 
 ```kot
 @RestController
@@ -287,7 +297,9 @@ class PostController(private val client: WebClient) {
 
 ```
 
-In the `withDetails` method, post and count are called one by one in a sequence.  If you want to call them in a parallel way,   try to use `async` context to wrap every calls, and put all tasks in a `coroutineScope` context. 
+In the `withDetails` method, post and count call remote APIs one by one in a sequence.  
+
+If you want to perform coroutines in parallel,   use `async` context to wrap every calls, and put all tasks in a `coroutineScope` context.  In `PostDetails`, to build the results, use `await` to wait the completion of the remote calls.
 
 ```kot
 private suspend fun withDetails(id: Long): PostDetails = coroutineScope {
