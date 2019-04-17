@@ -1,17 +1,17 @@
 # Using Kotlin Coroutines with Spring
-Before Spring 5.2,  you can experience Kotlin Coroutines by the effort from community, eg. [spring-kotlin-coroutine ](https://github.com/konrad-kaminski/spring-kotlin-coroutine) on Github. There are several features introduced in Spring 5.2,  besides [the functional programming style introduced in Spring MVC](https://github.com/hantsy/spring-webmvc-functional-sample), another attractive feature is that Kotlin Coroutines is finally get official support.
+Before Spring 5.2,  you can experience Kotlin Coroutines by the effort from community, eg. [spring-kotlin-coroutine ](https://github.com/konrad-kaminski/spring-kotlin-coroutine) on Github. There are several features introduced in Spring 5.2,  besides [the functional programming style introduced in Spring MVC](https://github.com/hantsy/spring-webmvc-functional-sample), another attractive feature is that Kotlin Coroutines is finally got official support.
 
-Kotlin coroutines provides an alternative approach to  write asynchronous applications with Spring Reactive stack, but in an imperative code style.
+Kotlin coroutines provides an alternative approach to  write asynchronous applications with Spring Reactive stack, but coding in an imperative style.
 
-In this post, I will rewrite [my reactive sample](https://github.com/hantsy/spring-reactive-sample) using Kotlin Coroutines with Spring.
+In this post, I will rewrite [my previous reactive sample](https://github.com/hantsy/spring-reactive-sample) using Kotlin Coroutines with Spring.
 
-Generate a Spring Boot project using [Spring initializr](https://start.spring.io).  
+Generate a Spring Boot project using [Spring initializr](https://start.spring.io).   Choose the following options in the Web UI, others accept the default options.
 
 * Language: Kotlin 
 * Spring Boot version : 2.2.0.BUILD-SNAPSHOT
 * Dependencies: Web Reactive
 
-Open the *pom.xml* file , add some modification. 
+Extract the files into your local disk. Open the *pom.xml* file in the project root folder, add some modification to get Kotlin Coroutines work in this project. 
 
 Add kotlin-coroutines related dependencies in the *dependencies* section.
 
@@ -28,19 +28,19 @@ Add kotlin-coroutines related dependencies in the *dependencies* section.
 </dependency>
 ```
 
-Define  a **kotlin-coroutines.version** in the properties.
+Define  a **kotlin-coroutines.version** in the properties using the latest 1.2.0 version.
 
 ```xml
 <kotlinx-coroutines.version>1.2.0</kotlinx-coroutines.version>
 ```
 
-Kotlin coroutines 1.2.0 is compatible with Kotlin 1.3.30, define a `kotlin.version` property in the pom.xml file to use this version.
+Kotlin coroutines 1.2.0 is compatible with Kotlin 1.3.30, define a `kotlin.version` property to override the default value in the parent BOM.
 
 ```kot
 <kotlin.version>1.3.30</kotlin.version>
 ```
 
-Spring Data are busy in adding Kotlin Coroutines support. Currently  Spring Data R2DBC got basic coroutines support in its`DatabaseClient`.  In this sample, we use Spring Data R2DBC for data operations.
+Currently Spring Data project is busy in adding Kotlin Coroutines support. At the moment Spring Data R2DBC got basic coroutines support in its `DatabaseClient`.  In this sample, we use Spring Data R2DBC for data operations.
 
 Add Spring Data R2DBC related dependencies, and use PostgresSQL as the backend database.
 
@@ -88,7 +88,7 @@ class DatabaseConfig : AbstractR2dbcConfiguration() {
 }
 ```
 
-Create a data class which is mapped to the table `posts`.
+Create a Kotlin data class, annotate it with `@Table`  which indicates it is mapped to the table  `posts`.
 
 ```java
 @Table("posts")
@@ -98,7 +98,7 @@ data class Post(@Id val id: Long? = null,
 )
 ```
 
-Follow the [Reactive stack to Kotlin Coroutines translation guide](https://docs.spring.io/spring/docs/5.2.0.M1/spring-framework-reference/languages.html#how-reactive-translates-to-coroutines) provided in Spring reference documentation, create a repository class for `Post`.
+Follow the [Reactive stack to Kotlin Coroutines translation guide](https://docs.spring.io/spring/docs/5.2.0.M1/spring-framework-reference/languages.html#how-reactive-translates-to-coroutines) provided in Spring reference documentation, we create a repository class for CRUD operations of `Post`. 
 
 ```java
 @Component
@@ -139,7 +139,13 @@ class PostRepository(private val client: DatabaseClient) {
 }
 ```
 
-Create a `@RestController` class for `Post`.
+It is easy to understand the above codes, for the return type of these functions.
+
+* The `Flux<T>`  is changed to Kotlin Coroutines `Flow` type. 
+* The `Mono` type is unboxed to parameterized type, and add a `suspend` modifier to the function. If the return result can be null, add a `?` to the return type, eg. `Post?`.
+* The `awaitXXX` or `flow()`  converts the Reactive APIs to Kotlin Coroutines world.
+
+Create a Controller class for `Post`, Kotlin Coroutines is also supported in the annotated controllers.
 
 ```java
 @RestController
@@ -265,16 +271,6 @@ class PostController(private val client: WebClient) {
                     .awaitBody<Any>()
 
 
-/*
-    @GetMapping("")
-    suspend fun findAll(): Flow<Post> =
-            client.get()
-                    .uri("/posts")
-                    .accept(MediaType.APPLICATION_JSON)
-                    .awaitExchange()
-                    .awaitBody()
-*/
-
     @GetMapping("/{id}")
     suspend fun findOne(@PathVariable id: Long): PostDetails = withDetails(id)
 
@@ -297,9 +293,9 @@ class PostController(private val client: WebClient) {
 
 ```
 
-In the `withDetails` method, post and count call remote APIs one by one in a sequence.  
+In the `withDetails` method, the post and count call the remote APIs one by one in a sequence.  
 
-If you want to perform coroutines in parallel,   use `async` context to wrap every calls, and put all tasks in a `coroutineScope` context.  In `PostDetails`, to build the results, use `await` to wait the completion of the remote calls.
+If you want to perform coroutines in parallel,   use `async` context to wrap every calls, and put all tasks in a `coroutineScope` context.  To build the return result in `PostDetails`, use `await` to wait the completion of the remote calls.
 
 ```kot
 private suspend fun withDetails(id: Long): PostDetails = coroutineScope {
