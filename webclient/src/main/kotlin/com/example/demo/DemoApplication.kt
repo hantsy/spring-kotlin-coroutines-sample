@@ -3,7 +3,6 @@ package com.example.demo
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.Flow
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.context.annotation.Bean
@@ -18,6 +17,7 @@ import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClient.builder
 import org.springframework.web.reactive.function.client.awaitBody
 import org.springframework.web.reactive.function.client.awaitExchange
+import org.springframework.web.reactive.function.client.bodyToFlow
 
 
 @SpringBootApplication
@@ -39,6 +39,18 @@ class WebClientConfiguration {
 @RestController
 @RequestMapping("/posts")
 class PostController(private val client: WebClient) {
+
+    /**
+     * see: https://stackoverflow.com/questions/55684117/how-to-return-a-kotlin-coroutines-flow-in-spring-reactive-webclient
+     */
+    @GetMapping("")
+    suspend fun findAll() =
+            client.get()
+                    .uri("/posts")
+                    .accept(MediaType.APPLICATION_JSON)
+                    .awaitExchange()
+                    .bodyToFlow<Post>()
+    /*
     @GetMapping("")
     suspend fun findAll() =
             client.get()
@@ -46,6 +58,8 @@ class PostController(private val client: WebClient) {
                     .accept(MediaType.APPLICATION_JSON)
                     .awaitExchange()
                     .awaitBody<Any>()
+
+     */
 
 
 /*
