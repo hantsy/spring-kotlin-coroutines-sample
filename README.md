@@ -36,7 +36,7 @@ Define  a **kotlin-coroutines.version** in the properties using the latest 1.2.0
 
 Kotlin coroutines 1.2.0 is compatible with Kotlin 1.3.30, define a `kotlin.version` property to override the default value in the parent BOM.
 
-```kot
+```xml
 <kotlin.version>1.3.30</kotlin.version>
 ```
 
@@ -175,7 +175,7 @@ class PostController(
 
 You can also initialize data in a `CommandLineRunner` bean or listen the `@ApplicationReadyEvent`, use a `runBlocking` to wrap coroutines tasks.
 
-```kot
+```kotlin
 runBlocking {
      val deleted = postRepository.deleteAll()
      println(" $deleted posts was cleared.")
@@ -193,7 +193,7 @@ Run the application now, it should  work well as [the previous Reactive examples
 
 In additional to the annotated controllers,  Kotlin Coroutines is also supported in functional RouterFunction DSL using the `coRouter`  to define your routing rules. 
 
-```ko
+```kotlin
 @Configuration
 class RouterConfiguration {
 
@@ -212,7 +212,7 @@ class RouterConfiguration {
 
 Like the changes in the controller, the `PostHandler` is written in an imperative style.
 
-```kot
+```kotlin
 @Component
 class PostHandler(private val posts: PostRepository) {
 
@@ -258,7 +258,7 @@ class PostHandler(private val posts: PostRepository) {
 
 Besides annotated controllers and functional router DSL, Spring `WebClient` also embrace Kotlin Coroutines.
 
-```kot
+```kotlin
 @RestController
 @RequestMapping("/posts")
 class PostController(private val client: WebClient) {
@@ -297,7 +297,7 @@ In the `withDetails` method, the post and count call the remote APIs one by one 
 
 If you want to perform coroutines in parallel,   use `async` context to wrap every calls, and put all tasks in a `coroutineScope` context.  To build the return result in `PostDetails`, use `await` to wait the completion of the remote calls.
 
-```kot
+```kotlin
 private suspend fun withDetails(id: Long): PostDetails = coroutineScope {
         val post = async {
             client.get().uri("/posts/$id")
