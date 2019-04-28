@@ -262,13 +262,14 @@ Besides annotated controllers and functional router DSL, Spring `WebClient` also
 @RestController
 @RequestMapping("/posts")
 class PostController(private val client: WebClient) {
+    
     @GetMapping("")
     suspend fun findAll() =
             client.get()
                     .uri("/posts")
                     .accept(MediaType.APPLICATION_JSON)
                     .awaitExchange()
-                    .awaitBody<Any>()
+                    .bodyToFlow<Post>()
 
 
     @GetMapping("/{id}")
