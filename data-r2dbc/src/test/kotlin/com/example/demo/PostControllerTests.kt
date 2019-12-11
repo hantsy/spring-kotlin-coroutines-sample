@@ -1,7 +1,7 @@
 package com.example.demo
 
 
-import kotlinx.coroutines.reactive.flow.asFlow
+import kotlinx.coroutines.reactive.asFlow
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.mockito.BDDMockito.given
@@ -33,13 +33,13 @@ class PostControllerTests {
         println(">> setup testing...")
     }
 
-
     @Test
     fun `get all posts`() {
         val postsFlow = Flux.just("Post one", "Post two")
                 .map {
                     Post(title = it, content = "content of $it")
-                }.asFlow()
+                }
+                .asFlow()
         given(posts.findAll()).willReturn(postsFlow)
         client.get()
                 .uri("/posts")

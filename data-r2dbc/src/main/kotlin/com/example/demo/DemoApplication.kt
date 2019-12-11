@@ -1,34 +1,22 @@
 package com.example.demo
 
 
-import io.r2dbc.postgresql.PostgresqlConnectionConfiguration
-import io.r2dbc.postgresql.PostgresqlConnectionFactory
-import io.r2dbc.spi.ConnectionFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.reactive.awaitFirstOrNull
-import kotlinx.coroutines.reactive.awaitLast
 import kotlinx.coroutines.reactive.awaitSingle
 import kotlinx.coroutines.runBlocking
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.boot.runApplication
-import org.springframework.context.annotation.Configuration
 import org.springframework.context.event.EventListener
-import org.springframework.core.annotation.Order
 import org.springframework.data.annotation.Id
-import org.springframework.data.domain.Sort.Order.desc
-import org.springframework.data.domain.Sort.by
-import org.springframework.data.r2dbc.config.AbstractR2dbcConfiguration
-import org.springframework.data.r2dbc.function.*
-import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories
+import org.springframework.data.r2dbc.core.*
 import org.springframework.data.relational.core.mapping.Column
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ServerWebExchange
-import org.springframework.web.server.WebExceptionHandler
-import reactor.core.publisher.Mono
 
 
 @SpringBootApplication
@@ -65,7 +53,7 @@ class DataInitializer(/*private val databaseClient: DatabaseClient,*/ private va
                 .subscribe(null, null, { println("initialization is done...") })*/
         runBlocking {
             val deleted = postRepository.deleteAll()
-            println(" $deleted posts was cleared.")
+            println(" $deleted posts removed.")
             postRepository.init()
         }
 
@@ -75,23 +63,6 @@ class DataInitializer(/*private val databaseClient: DatabaseClient,*/ private va
 
 }
 
-@Configuration
-@EnableR2dbcRepositories
-class DatabaseConfig : AbstractR2dbcConfiguration() {
-
-    override fun connectionFactory(): ConnectionFactory {
-        return PostgresqlConnectionFactory(
-                PostgresqlConnectionConfiguration.builder()
-                        .host("localhost")
-                        .database("test")
-                        .username("user")
-                        .password("password")
-                        .build()
-        )
-
-    }
-
-}
 
 @RestController
 @RequestMapping("/posts")
@@ -143,22 +114,27 @@ class RestWebExceptionHandler {
 class PostRepository(private val client: DatabaseClient) {
 
     suspend fun count(): Long =
-            client.execute().sql("SELECT COUNT(*) FROM posts")
-                    .asType<Long>().fetch().awaitOne()
+            client.execute("SELECT COUNT(*) FROM posts")
+                    .asType<Long>()
+                    .fetch()
+                    .awaitOne()
 
     fun findAll(): Flow<Post> =
-            client.select().from("posts").asType<Post>().fetch().flow()
+            client.select()
+                    .from("posts")
+                    .asType<Post>()
+                    .fetch()
+                    .flow()
 
     suspend fun findOne(id: Long): Post? =
-            client.execute()
-                    .sql("SELECT * FROM posts WHERE id = \$1")
-                    .bind(0, id).asType<Post>()
+            client.execute("SELECT * FROM posts WHERE id = \$1")
+                    .bind(0, id)
+                    .asType<Post>()
                     .fetch()
                     .awaitOneOrNull()
 
-    suspend fun deleteAll() =
-            client.execute()
-                    .sql("DELETE FROM posts")
+    suspend fun deleteAll(): Int =
+            client.execute("DELETE FROM posts")
                     .fetch()
                     .rowsUpdated()
                     .awaitSingle()
@@ -171,8 +147,6 @@ class PostRepository(private val client: DatabaseClient) {
                     .await()
 
     suspend fun init() {
-        //client.execute().sql("CREATE TABLE IF NOT EXISTS posts (login varchar PRIMARY KEY, firstname varchar, lastname varchar);").await()
-        //deleteAll()
         save(Post(title = "My first post title", content = "Content of my first post"))
         save(Post(title = "My second post title", content = "Content of my second post"))
     }
@@ -180,20 +154,19 @@ class PostRepository(private val client: DatabaseClient) {
 
 @Component
 class CommentRepository(private val client: DatabaseClient) {
+
     suspend fun save(comment: Comment) =
             client.insert().into<Comment>().table("comments").using(comment).await()
 
     suspend fun countByPostId(postId: Long): Long =
-            client.execute()
-                    .sql("SELECT COUNT(*) FROM comments WHERE post_id = \$1")
+            client.execute("SELECT COUNT(*) FROM comments WHERE post_id = \$1")
                     .bind(0, postId)
                     .asType<Long>()
                     .fetch()
                     .awaitOne()
 
     fun findByPostId(postId: Long): Flow<Comment> =
-            client.execute()
-                    .sql("SELECT * FROM comments WHERE post_id = \$1")
+            client.execute("SELECT * FROM comments WHERE post_id = \$1")
                     .bind(0, postId).asType<Comment>()
                     .fetch()
                     .flow()
