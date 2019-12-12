@@ -125,7 +125,7 @@ class PostHandler(private val posts: PostRepository) {
     suspend fun delete(req: ServerRequest): ServerResponse {
         val deletedCount = this.posts.deleteById(req.pathVariable("id").toLong())
         println("$deletedCount posts deleted")
-        return notFound().buildAndAwait()
+        return noContent().buildAndAwait()
     }
 }
 
