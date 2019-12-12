@@ -15,7 +15,9 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.event.EventListener
 import org.springframework.data.annotation.Id
 import org.springframework.data.r2dbc.config.AbstractR2dbcConfiguration
-import org.springframework.data.r2dbc.function.*
+import org.springframework.data.r2dbc.core.*
+import org.springframework.data.r2dbc.query.Criteria
+import org.springframework.data.r2dbc.query.Update
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories
 import org.springframework.data.relational.core.mapping.Column
 import org.springframework.data.relational.core.mapping.Table
@@ -66,23 +68,6 @@ class DataInitializer(/*private val databaseClient: DatabaseClient,*/ private va
 
 }
 
-@Configuration
-@EnableR2dbcRepositories
-class DatabaseConfig : AbstractR2dbcConfiguration() {
-
-    override fun connectionFactory(): ConnectionFactory {
-        return PostgresqlConnectionFactory(
-                PostgresqlConnectionConfiguration.builder()
-                        .host("localhost")
-                        .database("test")
-                        .username("user")
-                        .password("password")
-                        .build()
-        )
-
-    }
-
-}
 
 @Configuration
 class RouterConfiguration {
@@ -118,7 +103,7 @@ class PostHandler(private val posts: PostRepository) {
         val foundPost = this.posts.findOne(req.pathVariable("id").toLong())
         println("found post:$foundPost")
         return when {
-            foundPost != null -> ok().bodyAndAwait(foundPost)
+            foundPost != null -> ok().bodyValueAndAwait(foundPost)
             else -> notFound().buildAndAwait()
         }
     }
@@ -139,7 +124,7 @@ class PostHandler(private val posts: PostRepository) {
 
     suspend fun delete(req: ServerRequest): ServerResponse {
         val deletedCount = this.posts.deleteById(req.pathVariable("id").toLong())
-        println("$deletedCount posts was deleted")
+        println("$deletedCount posts deleted")
         return notFound().buildAndAwait()
     }
 }
@@ -148,62 +133,77 @@ class PostHandler(private val posts: PostRepository) {
 class PostRepository(private val client: DatabaseClient) {
 
     suspend fun count(): Long =
-            client.execute().sql("SELECT COUNT(*) FROM posts")
+            client.execute("SELECT COUNT(*) FROM posts")
                     .asType<Long>()
                     .fetch()
                     .awaitOne()
 
     fun findAll(): Flow<Post> =
             client.select()
-                    .from("posts")
-                    .asType<Post>()
+                    .from(Post::class.java)
                     .fetch()
                     .flow()
 
     suspend fun findOne(id: Long): Post? =
-            client.execute()
-                    .sql("SELECT * FROM posts WHERE id = \$1")
-                    .bind(0, id)
-                    .asType<Post>()
+            client.select()
+                    .from(Post::class.java)
+                    .matching(Criteria.where("id").`is`(id))
                     .fetch()
                     .awaitOneOrNull()
+//            client.execute("SELECT * FROM posts WHERE id = \$1")
+//                    .bind(0, id)
+//                    .asType<Post>()
+//                    .fetch()
+//                    .awaitOneOrNull()
 
-    suspend fun deleteById(id: Long) =
-            client.execute()
-                    .sql("DELETE FROM posts WHERE id = \$1")
+    suspend fun deleteById(id: Long): Int =
+            client.execute("DELETE FROM posts WHERE id = \$1")
                     .bind(0, id)
                     .fetch()
                     .rowsUpdated()
                     .awaitSingle()
 
-    suspend fun deleteAll() =
-            client.execute().sql("DELETE FROM posts").fetch().rowsUpdated().awaitSingle()
+    suspend fun deleteAll(): Int =
+            client.delete()
+                    .from(Post::class.java)
+                    .fetch()
+                    .rowsUpdated()
+                    .awaitSingle()
+    //client.execute("DELETE FROM posts").fetch().rowsUpdated().awaitSingle()
 
     suspend fun save(post: Post) =
             client.insert()
-                    .into<Post>().table("posts")
+                    .into(Post::class.java)
                     .using(post)
-                    .map{ t, u ->
+                    .map { t, u ->
                         //println(t.get("id"))
                         t.get("id", Integer::class.java)?.toLong()
-                     }
+                    }
                     .awaitOne()
 
 
-    suspend fun update(post: Post) =
-            client.execute()
-                    .sql("UPDATE posts SET title = \$2, content = \$3 WHERE id = \$1")
-                    .bind(0, post.id!!)
-                    .bind(1, post.title!!)
-                    .bind(2, post.content!!)
+    suspend fun update(post: Post): Int =
+            client.update()
+                    .table("posts")
+                    .using(Update.update("title", post.title)
+                            .set("content", post.content))
+                    .matching(Criteria.where("id").`is`(post.id!!))
                     .fetch()
                     .rowsUpdated()
                     .awaitSingle()
+
+//            client.execute("UPDATE posts SET title = \$2, content = \$3 WHERE id = \$1")
+//                    .bind(0, post.id!!)
+//                    .bind(1, post.title!!)
+//                    .bind(2, post.content!!)
+//                    .fetch()
+//                    .rowsUpdated()
+//                    .awaitSingle()
 
     suspend fun init() {
         //client.execute().sql("CREATE TABLE IF NOT EXISTS posts (login varchar PRIMARY KEY, firstname varchar, lastname varchar);").await()
         val deletedCount = deleteAll()
-        println(" $deletedCount posts are deleted!")
+        println(" $deletedCount posts deleted!")
         save(Post(title = "My first post title", content = "Content of my first post"))
         save(Post(title = "My second post title", content = "Content of my second post"))
     }
@@ -216,16 +216,14 @@ class CommentRepository(private val client: DatabaseClient) {
             client.insert().into<Comment>().table("comments").using(comment).await()
 
     suspend fun countByPostId(postId: Long): Long =
-            client.execute()
-                    .sql("SELECT COUNT(*) FROM comments WHERE post_id = \$1")
+            client.execute("SELECT COUNT(*) FROM comments WHERE post_id = \$1")
                     .bind(0, postId)
                     .asType<Long>()
                     .fetch()
                     .awaitOne()
 
     fun findByPostId(postId: Long): Flow<Comment> =
-            client.execute()
-                    .sql("SELECT * FROM comments WHERE post_id = \$1")
+            client.execute("SELECT * FROM comments WHERE post_id = \$1")
                     .bind(0, postId).asType<Comment>()
                     .fetch()
                     .flow()
