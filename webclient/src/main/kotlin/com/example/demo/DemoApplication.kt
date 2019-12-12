@@ -50,28 +50,6 @@ class PostController(private val client: WebClient) {
                     .accept(MediaType.APPLICATION_JSON)
                     .awaitExchange()
                     .bodyToFlow<Post>()
-    /*
-    @GetMapping("")
-    suspend fun findAll() =
-            client.get()
-                    .uri("/posts")
-                    .accept(MediaType.APPLICATION_JSON)
-                    .awaitExchange()
-                    .awaitBody<Any>()
-
-     */
-
-
-/*
-    @GetMapping("")
-    suspend fun findAll(): Flow<Post> =
-            client.get()
-                    .uri("/posts")
-                    .accept(MediaType.APPLICATION_JSON)
-                    .awaitExchange()
-                    .awaitBody()
-
-*/
 
     @GetMapping("/{id}")
     suspend fun findOne(@PathVariable id: Long): PostDetails = withDetails(id)
