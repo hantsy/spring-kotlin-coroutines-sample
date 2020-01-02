@@ -14,6 +14,7 @@ import org.springframework.data.mongodb.core.*
 import org.springframework.data.mongodb.core.mapping.Document
 import org.springframework.data.mongodb.core.query.Criteria.where
 import org.springframework.data.mongodb.core.query.Query.query
+import org.springframework.data.mongodb.core.query.Update
 import org.springframework.data.mongodb.core.query.isEqualTo
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
@@ -30,29 +31,12 @@ fun main(args: Array<String>) {
 }
 
 @Component
-class DataInitializer(/*private val databaseClient: DatabaseClient,*/ private val postRepository: PostRepository) {
+class DataInitializer(private val postRepository: PostRepository) {
 
     @EventListener(value = [ApplicationReadyEvent::class])
     fun init() {
         println(" start data initialization  ...")
-        /*this.databaseClient.insert()
-                .into("posts")
-                //.nullValue("id", Long::class.java)
-                .value("title", "First post title")
-                .value("content", "Content of my first post")
-                .then()
-                //
-                .log()
-                .thenMany(
-                        this.databaseClient.select()
-                                .from("posts")
-                                .orderBy(by(desc("id")))
-                                .`as`(Post::class.java)
-                                .fetch()
-                                .all()
-                                .log()
-                )
-                .subscribe(null, null, { println("initialization is done...") })*/
+
         runBlocking {
             val deleted = postRepository.deleteAll()
             println(" $deleted posts removed.")
@@ -136,7 +120,10 @@ class PostRepository(private val mongo: ReactiveFluentMongoOperations) {
             mongo.insert<Post>().oneAndAwait(post)
 
     suspend fun update(post: Post) =
-            mongo.update<Post>().replaceWith(post)
+            mongo.update<Post>()
+//                    .matching(query(where("id").isEqualTo(id)))
+//                    .apply(Update.update("title",post.title!!).set("content", post.content!!))
+                    .replaceWith(post)
                     .asType<Post>().findReplaceAndAwait()
 
     suspend fun init() {
