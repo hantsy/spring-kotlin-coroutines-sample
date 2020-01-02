@@ -16,5 +16,10 @@ services:
       - ./data/postgresql:/var/lib/postgresql
       - ./pg-initdb.d:/docker-entrypoint-initdb.d
       
-
+  mongodb: 
+    image: mongo 
+    volumes:
+      - ./data/mongo:/data/db
+    ports:
+      - "27017:27017"
        
