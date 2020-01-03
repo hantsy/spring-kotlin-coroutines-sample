@@ -14,7 +14,6 @@ import org.springframework.data.mongodb.core.*
 import org.springframework.data.mongodb.core.mapping.Document
 import org.springframework.data.mongodb.core.query.Criteria.where
 import org.springframework.data.mongodb.core.query.Query.query
-import org.springframework.data.mongodb.core.query.Update
 import org.springframework.data.mongodb.core.query.isEqualTo
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
@@ -82,7 +81,7 @@ class PostController(
             commentRepository.countByPostId(id)
 
     @PostMapping("{id}/comments")
-    suspend fun saveComment(@PathVariable id: Long, @RequestBody comment: Comment) =
+    suspend fun saveComment(@PathVariable id: String, @RequestBody comment: Comment) =
             commentRepository.save(comment.copy(postId = id, content = comment.content))
 }
 
@@ -153,7 +152,7 @@ class CommentRepository(private val mongo: ReactiveFluentMongoOperations) {
 data class Comment(
         @Id val id: String? = null,
         val content: String? = null,
-        val postId: Long? = null
+        val postId: String? = null
 )
 
 @Document
