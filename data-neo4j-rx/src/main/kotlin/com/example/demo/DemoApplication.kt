@@ -71,7 +71,7 @@ class PostController(
             postRepository.save(post)
 
     @GetMapping("{id}/comments")
-    fun findCommentsByPostId(@PathVariable id: Long): Flow<Comment> =
+    fun findCommentsByPostId(@PathVariable id: String): Flow<Comment> =
             commentRepository.findByPostId(id)
 
     @GetMapping("{id}/comments/count")
@@ -206,7 +206,7 @@ class CommentRepository(private val client: ReactiveNeo4jClient) {
                     .one()
                     .awaitSingle()
 
-    fun findByPostId(postId: Long): Flow<Comment> =
+    fun findByPostId(postId: String): Flow<Comment> =
             client
                     .query(
                             "MATCH (c:Comment) WHERE c.postId = '$postId' " +
@@ -220,17 +220,13 @@ class CommentRepository(private val client: ReactiveNeo4jClient) {
 }
 
 
-//@Node("Comment")
 data class Comment(
-        //@Id @GeneratedValue
         val id: String? = null,
         val content: String? = null,
         val postId: String? = null
 )
 
-//@Node("Post")
 data class Post(
-        //@Id @GeneratedValue
         val id: String? = null,
         val title: String? = null,
         val content: String? = null,
