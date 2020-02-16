@@ -66,6 +66,10 @@ class PostController(
     suspend fun findOne(@PathVariable id: String): Post? =
             postRepository.findOne(id) ?: throw PostNotFoundException(id)
 
+    @PutMapping("{id}")
+    suspend fun update(@PathVariable id: String, @RequestBody post: Post)=
+            postRepository.save(post.copy(id=id))
+
     @PostMapping("")
     suspend fun save(@RequestBody post: Post) =
             postRepository.save(post)
@@ -80,7 +84,7 @@ class PostController(
 
     @PostMapping("{id}/comments")
     suspend fun saveComment(@PathVariable id: String, @RequestBody comment: Comment) =
-            commentRepository.save(comment.copy(postId = id, content = comment.content))
+            commentRepository.save(Comment(postId = id, content = comment.content))
 }
 
 
@@ -124,7 +128,7 @@ class PostRepository(private val client: ReactiveNeo4jClient) {
                                 r.get("content").asString(),
                                 r.get("createdAt").asLocalDate(null),
                                 r.get("updatedAt").asLocalDate(null)
-                               // if (null != r.get("createdAt") && "NULL" != r.get("createdAt").type().name()) r.get("createdAt").asLocalDate() else null,
+                                // if (null != r.get("createdAt") && "NULL" != r.get("createdAt").type().name()) r.get("createdAt").asLocalDate() else null,
                                 //if (null != r.get("updatedAt") && "NULL" != r.get("updatedAt").type().name()) r.get("updatedAt").asLocalDate() else null
                         )
                     }
@@ -135,12 +139,20 @@ class PostRepository(private val client: ReactiveNeo4jClient) {
             client
                     .query(
                             "MATCH (p:Post)  \n" +
-                                    "WHERE p.id = '$id'\n" +
+                                    "WHERE p.id = \$id\n" +
                                     "RETURN p.id as id, p.title as title, p.content as content"
                     )
                     .bind(id).to("id")
                     .fetchAs(Post::class.java)
-                    .mappedBy { ts, r -> Post(r.get("id").asString(), r.get("title").asString(), r.get("content").asString()) }
+                    .mappedBy { ts, r ->
+                        Post(
+                                r.get("id").asString(),
+                                r.get("title").asString(),
+                                r.get("content").asString(),
+                                r.get("createdAt").asLocalDate(null),
+                                r.get("updatedAt").asLocalDate(null)
+                        )
+                    }
                     .one()
                     .awaitSingle()
 
@@ -151,10 +163,10 @@ class PostRepository(private val client: ReactiveNeo4jClient) {
                     .awaitSingle()
 
     suspend fun save(post: Post) {
-        val query = "MERGE (p:Post {id: \$id, title: \$title, content: \$content}) \n" +
-                "  ON CREATE SET p.createdAt=date() \n" +
-                "  ON MATCH SET p.updatedAt=date() \n" +
-                "RETURN p.id as id, p.title as title, p.content as content"
+        val query = "MERGE (p:Post {id: \$id}) \n" +
+                " ON CREATE SET p.createdAt=date(), p.title=\$title, p.content=\$content\n" +
+                " ON MATCH SET p.updatedAt=date(), p.title=\$title, p.content=\$content\n" +
+                " RETURN p.id as id, p.title as title, p.content as content, p.createdAt as createdAt, p.updatedAt as updatedAt"
 
         client.query(query)
                 .bind(post).with {
@@ -178,18 +190,26 @@ class PostRepository(private val client: ReactiveNeo4jClient) {
 class CommentRepository(private val client: ReactiveNeo4jClient) {
 
     suspend fun save(comment: Comment) {
-        val query = " MERGE (c:Comment {id: \$id, content: \$content, postId: \$postId}) " +
-                "ON CREATE SET createdAt=date() " +
-                "ON MATCH SET updatedAt=date() " +
-                "RETURN c.id as id, c.content as content"
+        val query = " MERGE (c:Comment {id: \$id}) " +
+                "ON CREATE SET c.createdAt=date(), c.content=\$content, c.postId=\$postId " +
+                "ON MATCH SET c.updatedAt=date(), c.content=\$content, c.postId=\$postId " +
+                "RETURN c.id as id, c.content as content, c.postId as postId, c.createdAt as createdAt, c.updatedAt as updatedAt"
 
         client.query(query)
                 .bind(comment).with {
                     mapOf("id" to (comment.id
-                            ?:  UUID.randomUUID().toString()), "postId" to comment.postId, "content" to comment.content)
+                            ?: UUID.randomUUID().toString()), "postId" to comment.postId, "content" to comment.content)
                 }
                 .fetchAs(Comment::class.java)
-                .mappedBy { ts, r -> Comment(r.get("id").asString(), r.get("content").asString()) }
+                .mappedBy { ts, r ->
+                    Comment(
+                            r.get("id").asString(),
+                            r.get("content").asString(),
+                            r.get("postId").asString(),
+                            r.get("createdAt").asLocalDate(null),
+                            r.get("updatedAt").asLocalDate(null)
+                    )
+                }
                 .one()
                 .awaitSingle()
     }
@@ -197,7 +217,7 @@ class CommentRepository(private val client: ReactiveNeo4jClient) {
     suspend fun countByPostId(postId: String): Long =
             client
                     .query(
-                            "MATCH (c:Comment) WHERE c.postId = '$postId' " +
+                            "MATCH (c:Comment) WHERE c.postId = \$postId " +
                                     "RETURN count(c)"
                     )
                     .bind(postId).to("postId")
@@ -209,12 +229,20 @@ class CommentRepository(private val client: ReactiveNeo4jClient) {
     fun findByPostId(postId: String): Flow<Comment> =
             client
                     .query(
-                            "MATCH (c:Comment) WHERE c.postId = '$postId' " +
-                                    "RETURN c.id as id, c.content as content"
+                            "MATCH (c:Comment) WHERE c.postId = \$postId " +
+                                    " RETURN c.id as id, c.content as content, c.postId as postId, c.createdAt as createdAt, c.updatedAt as updatedAt"
                     )
                     .bind(postId).to("postId")
                     .fetchAs(Comment::class.java)
-                    .mappedBy { ts, r -> Comment(r.get("id").asString(), r.get("content").asString()) }
+                    .mappedBy { ts, r ->
+                        Comment(
+                                r.get("id").asString(),
+                                r.get("content").asString(),
+                                r.get("postId").asString(),
+                                r.get("createdAt").asLocalDate(null),
+                                r.get("updatedAt").asLocalDate(null)
+                        )
+                    }
                     .all()
                     .asFlow()
 }
@@ -223,7 +251,9 @@ class CommentRepository(private val client: ReactiveNeo4jClient) {
 data class Comment(
         val id: String? = null,
         val content: String? = null,
-        val postId: String? = null
+        val postId: String? = null,
+        val createdAt: LocalDate? = null,
+        val updatedAt: LocalDate? = null
 )
 
 data class Post(
